@@ -1,0 +1,781 @@
+{
+  "name": "Reddit Lead Gen",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-480, 32],
+      "id": "1dd280b1-57fb-4aaa-ba51-6bc15c61901f",
+      "name": "When clicking ‘Test workflow’"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Helper to safely parse JSON if possible\nfunction safeParse(str) {\n  try {\n    return JSON.parse(str);\n  } catch {\n    return str;\n  }\n}\n\n// Step 1: Get raw output from possible locations\nlet raw = items[0].json.output \n       || items[0].json.content \n       || items[0].json.message\n       || items[0].json;\n\n// Step 2: If it's a string that looks like JSON array/object, parse once\nif (typeof raw === \"string\" && /^[\\[{]/.test(raw.trim())) {\n  raw = safeParse(raw.trim());\n}\n\n// Step 3: If it's an array with `.text` field (Claude style), join or take first\nif (Array.isArray(raw) && raw[0]?.text) {\n  raw = raw.map(c => c.text || \"\").join(\"\\n\").trim();\n}\n\n// Step 4: If after this, it's still a string that looks like JSON, parse again\nif (typeof raw === \"string\" && /^[\\[{]/.test(raw.trim())) {\n  raw = safeParse(raw.trim());\n}\n\n// Step 5: If still string with markdown fences, clean it and parse\nif (typeof raw === \"string\") {\n  raw = raw.replace(/```json|```/gi, \"\").trim();\n  if (/^{[\\s\\S]*}$/.test(raw)) {\n    raw = safeParse(raw);\n  }\n}\n\n// Step 6: Final check — must be object now\nif (typeof raw !== \"object\" || Array.isArray(raw)) {\n  throw new Error(\"Final parsed output is not an object: \" + JSON.stringify(raw));\n}\n\nreturn [{ json: raw }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [704, 384],
+      "id": "ca4ca7a9-12e9-4d7a-9a26-1068df7f0ff7",
+      "name": "Parse Response",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c9ed2547-7caf-4a24-aee7-ab81bab009e1",
+              "leftValue": "={{ $json.is_lead }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "129e8170-2c3a-441e-ac19-8b63400f7641",
+              "leftValue": "={{ $json.nurture_action }}",
+              "rightValue": "=Ignore",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [944, 368],
+      "id": "ef27ea3b-39ec-4f3b-aeca-4ba1cd74a813",
+      "name": "Store if it's lead",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "subreddit": "={{ $json.Subreddits.substring(2).trim().toLowerCase() }}",
+        "limit": 10,
+        "filters": {
+          "category": "new"
+        }
+      },
+      "type": "n8n-nodes-base.reddit",
+      "typeVersion": 1,
+      "position": [-48, 368],
+      "id": "8acb87d2-d12b-4c03-a0c8-f3e9ca12d1db",
+      "name": "Get many posts"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1eTPaVockpR2C-qvdx2G7XAHrEr6BUpegmBMJlIDPorQ",
+          "mode": "list",
+          "cachedResultName": "Reddit Groups",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1eTPaVockpR2C-qvdx2G7XAHrEr6BUpegmBMJlIDPorQ/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1eTPaVockpR2C-qvdx2G7XAHrEr6BUpegmBMJlIDPorQ/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [-240, 144],
+      "id": "d52ca485-c54c-433a-afc2-3d40744e3ad6",
+      "name": "Get all SubReddits",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [-240, 352],
+      "id": "936a5c47-933a-4805-9b5d-e4bf10c47c56",
+      "name": "Loop Over SubReddits"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "14Aj-FDxAGmtIA9qtlF2QBhQ_pI8upnIingXLBB-J3Hc",
+          "mode": "list",
+          "cachedResultName": "Reddit Leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/14Aj-FDxAGmtIA9qtlF2QBhQ_pI8upnIingXLBB-J3Hc/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "New Tweet",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/14Aj-FDxAGmtIA9qtlF2QBhQ_pI8upnIingXLBB-J3Hc/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "lead_type": "={{ $json.lead_type }}",
+            "author": "={{ $json.author }}",
+            "priority": "={{ $json.priority }}",
+            "post_id": "={{ $json.post_id }}",
+            "reasoning": "={{ $json.reasoning }}",
+            "resource_link": "={{ $json.resource_link }}",
+            "payment_intent": "={{ $json.payment_intent }}",
+            "reddit_url": "={{ $json.reddit_url }}",
+            "is_lead": "={{ $json.is_lead }}",
+            "post_body": "={{ $json.post_body }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "lead_type",
+              "displayName": "lead_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "author",
+              "displayName": "author",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "payment_intent",
+              "displayName": "payment_intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "priority",
+              "displayName": "priority",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "post_id",
+              "displayName": "post_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "post_body",
+              "displayName": "post_body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "reasoning",
+              "displayName": "reasoning",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "resource_link",
+              "displayName": "resource_link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "reddit_url",
+              "displayName": "reddit_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "is_lead",
+              "displayName": "is_lead",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1168, 352],
+      "id": "afde3b7e-082d-4657-a910-d030a9bdacb1",
+      "name": "Append Lead"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "14Aj-FDxAGmtIA9qtlF2QBhQ_pI8upnIingXLBB-J3Hc",
+          "mode": "list",
+          "cachedResultName": "Reddit Leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/14Aj-FDxAGmtIA9qtlF2QBhQ_pI8upnIingXLBB-J3Hc/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "New Tweet",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/14Aj-FDxAGmtIA9qtlF2QBhQ_pI8upnIingXLBB-J3Hc/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [-240, -64],
+      "id": "0c22338e-1210-4f80-87de-3cc981259f1f",
+      "name": "Get all Saved Leads",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "11b89afb-415a-40c9-928f-53eeb12d74cc",
+              "leftValue": "={{ $node[\"Set Saved IDs\"].json.postIds || [] }}",
+              "rightValue": "={{ $json.id }}",
+              "operator": {
+                "type": "array",
+                "operation": "contains",
+                "rightType": "any"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [928, -80],
+      "id": "92d3cf8f-48c2-4048-9b35-aaf3b1014345",
+      "name": "Check Post ID"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\n// Always return one item — so downstream nodes always have context\nreturn [\n  {\n    json: {\n      postIds: items.length !== 0\n        ? items.map(item => item.json.post_id)\n        : []\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-48, -64],
+      "id": "75129b62-7365-40b9-aaa1-5b14c5b6c541",
+      "name": "Set Saved IDs"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "4827f326-436c-4fe8-a68c-99321ef6c56c",
+              "leftValue": "={{ $json.created_utc }}",
+              "rightValue": "={{ Math.floor(Date.now() / 1000) - (24 * 60 * 60) }}",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [192, 160],
+      "id": "aa15f4bd-deba-4d7e-9ece-f14d346121d2",
+      "name": "Check Post Freshness"
+    },
+    {
+      "parameters": {
+        "jsCode": "function shuffleArrayOfObjects(array) {\n  let currentIndex = array.length, randomIndex;\n\n  // While there remain elements to shuffle.\n  while (currentIndex !== 0) {\n\n    // Pick a remaining element.\n    randomIndex = Math.floor(Math.random() * currentIndex);\n    currentIndex--;\n\n    // And swap it with the current element.\n    [array[currentIndex], array[randomIndex]] = [\n      array[randomIndex], array[currentIndex]];\n  }\n\n  return array;\n}\n\nconst shuffledObjects = shuffleArrayOfObjects($input.all());\nreturn shuffledObjects.slice(0, 10);"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-48, 144],
+      "id": "c4639400-e7e3-4e83-ad38-7f9849e89437",
+      "name": "Randomize Subreddits"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [464, 160],
+      "id": "e7855771-6e0b-410f-940e-40aaacc5b333",
+      "name": "Merge"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [704, 160],
+      "id": "b574cd32-1865-4b9f-b15d-f3fde15aa90f",
+      "name": "Wait",
+      "webhookId": "653a66b1-8769-4e94-a130-35e079dd4740"
+    },
+    {
+      "parameters": {
+        "options": {
+          "reset": false
+        }
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [688, -80],
+      "id": "70021816-eaf7-49b4-8546-8923b2fff723",
+      "name": "Loop Over Posts"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2047eaf5-efe8-48b7-9c65-3e98c19c23c3",
+              "name": "Prompt (User Message)",
+              "value": "=You evaluate Reddit posts STRICTLY to identify paid technical work related to:\n\n- web development (Next.js, React, Node.js)\n- backend/server work\n- cloud setups (AWS, GCP, Firebase)\n- automation (n8n, Zapier, custom APIs)\n- AI agents, chatbots, RAG, workflow automation\n\nYou must ignore EVERYTHING else, including:\n- mobile app development (Android/iOS/Flutter)\n- general collaboration or idea sharing\n- SaaS marketing or growth discussions\n- job seekers or “looking for work”\n- design, UI/UX, graphics, video\n- student homework, debugging, or learning questions\n- hobby or personal toy projects\n- “build my startup for equity” requests\n- general SaaS discussions without hiring intent\n\nYou only classify posts where the user is clearly looking to PAY someone to do technical work.\n\nA post is a potential lead ONLY IF:\n1. It requests paid help (explicitly or strongly implied)\n2. It matches your allowed service areas\n3. It is not a general question, tutorial request, or collaboration post\n\nReturn JSON in this exact format:\n\n{\n  \"is_lead\": true | false,\n  \"lead_type\": \"automation | backend | ai | cloud | webapp | unknown\",\n  \"payment_intent\": \"High | Medium | Low\",\n  \"priority\": \"High | Medium | Low\",\n  \"nurture_action\": \"Hot Lead | Warm Lead | Ignore\",\n  \"budget_mentioned\": \"string | null\",\n  \"reasoning\": \"Short factual justification\",\n  \"post_id\": \"{{ $json.id }}\",\n  \"post_body\": \"{{ $json.selftext }}\",\n  \"author\": \"{{ $json.author }}\",\n  \"reddit_url\": \"{{ $json.url }}\"\n}\n\nLEAD RULES:\n- is_lead = true ONLY if the post is clearly looking to hire.\n- payment_intent:\n   High → budget mentioned OR paid/freelancer/contractor explicitly stated\n   Medium → “need help fast”, “looking for dev”, “can someone build”\n   Low → weak intent, no hiring language\n- nurture_action:\n   Hot Lead → is_lead = true AND payment_intent = High\n   Warm Lead → is_lead = true AND payment_intent = Medium\n   Ignore → everything else\n\nReturn ONLY the JSON object. No markdown. No extra text.\n",
+              "type": "string"
+            },
+            {
+              "id": "209cd8db-58ca-40f0-b476-68f913571d63",
+              "name": "System Message",
+              "value": "=You are a lead qualification engine. Your ONLY job is to identify Reddit posts where the user is clearly seeking PAID technical help for:\n\n- backend work (Node.js, Next.js, APIs, servers)\n- automation (n8n, Zapier, workflow automation)\n- cloud engineering (AWS, GCP, Firebase deployments)\n- AI agents, chatbots, or AI workflow development\n- web applications (NOT mobile apps)\n\nYou must strictly reject any post that does NOT directly request paid help for these categories.\n\nYou must also reject:\n- mobile app development (Android, iOS, Flutter, React Native)\n- UI/UX design, graphics, video editing\n- job seekers introducing themselves\n- cofounder/equity-only requests\n- collaboration or “partner with me”\n- SaaS marketing, growth, or user acquisition discussions\n- general tech discussions or idea validation\n- bug fixing, debugging, student questions, learning/tutoring requests\n- “how to build” or “how do I do X” questions\n- any post without clear paid-hiring intent\n\nA post only qualifies as a lead if:\n1. The user explicitly or strongly implies they are hiring or paying for work.\n2. The work is directly related to backend, automation, cloud, AI, or webapp development.\n3. The request is not vague, exploratory, or hobby-level.\n\nBe extremely strict. If there is ANY doubt, classify it as not a lead.\n\nYou must output ONLY valid JSON returned by the User Prompt. No commentary, no formatting, no markdown.\n",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [928, 160],
+      "id": "0685f8cb-1f5c-48c9-9d10-a441eed045a4",
+      "name": "Set Prompts"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "31jvwEkxtKXd8DMK",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/31jvwEkxtKXd8DMK",
+          "cachedResultName": "AI Agents"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Prompt (User Message)": "={{ $json[\"Prompt (User Message)\"] }}",
+            "System Message": "={{ $json[\"System Message\"] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Prompt (User Message)",
+              "displayName": "Prompt (User Message)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "System Message",
+              "displayName": "System Message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [1152, 160],
+      "id": "4805410f-6973-4d4d-a97c-43967d65ddcb",
+      "name": "Use AI Agents"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst results = [];\n\nconst TECH_KEYWORDS = [\n  'n8n', 'zapier', 'automation', 'api', 'openai', 'chatgpt',\n  'workflow', 'integrate', 'bot', 'script', 'backend', 'server',\n  'nextjs', 'node', 'developer', 'devops', 'cloud', 'aws', \n  'firebase', 'mongodb', 'saas', 'custom', 'setup', 'connect'\n];\n\n// STRICT — block mobile apps entirely\nconst MOBILE_KEYWORDS = [\n  'android', 'ios', 'flutter', 'react native', 'mobile app', 'app development'\n];\n\n// People who are *selling themselves*\nconst BLACKLIST_BODY = [\n  'looking for full time work',\n  'looking for part time work',\n  'looking for part-time work',\n  'graphic designer',\n  'i’m a virtual assistant',\n  'hire me',\n  'telegram',\n  'equity',\n  'partnership',\n  'collaborate',\n  'cofounder'\n];\n\n// Useless subs\nconst BLACKLIST_SUBS = [\n  'learnprogramming', 'askprogramming', 'javascript', 'python',\n  'java', 'cscareerquestions', 'coding', 'reactjs', 'programming',\n  'androiddev', 'webdev', 'flutterdev'\n];\n\n// MUST contain hiring/payment intent\nconst HIRE_WORDS = [\n  'paid', 'pay', 'budget', 'hire', 'freelancer', 'contract', \n  'developer needed', 'build for me', 'looking for developer',\n  'need a developer', 'paid project'\n];\n\n// At least 1 technical action word\nconst ACTION_WORDS = [\n  'help', 'build', 'automate', 'develop', 'create', 'need',\n  'fix', 'connect', 'setup', 'integrate'\n];\n\nfor (const item of items) {\n  const sub = (item.json.subreddit || '').toLowerCase();\n  const title = (item.json.title || '').toLowerCase();\n  const body = (item.json.selftext || '').toLowerCase();\n  const combined = `${title} ${body}`.trim();\n\n  // --- HARD FILTERS FIRST ---\n\n  // 1. Block trash subs\n  if (BLACKLIST_SUBS.includes(sub)) continue;\n\n  // 2. Block body containing blacklisted phrases\n  if (BLACKLIST_BODY.some(k => combined.includes(k))) continue;\n\n  // 3. Block mobile app clients (you don't want them)\n  if (MOBILE_KEYWORDS.some(k => combined.includes(k))) continue;\n\n  // 4. Post must include hiring/payment intent\n  if (!HIRE_WORDS.some(w => combined.includes(w))) continue;\n\n  // 5. Skip very short or empty posts\n  if (combined.length < 50) continue;\n\n  // 6. Block learning/tutorial/student requests\n  if (/(learn|tutorial|school|assignment|college|homework)/.test(combined)) continue;\n\n  // --- SOFT TECH CHECKS ---\n\n  // 7. Must mention at least one relevant tech keyword\n  if (!TECH_KEYWORDS.some(k => combined.includes(k))) continue;\n\n  // 8. Must contain an action word (\"build\", \"need\", \"help\", etc.)\n  if (!ACTION_WORDS.some(k => combined.includes(k))) continue;\n\n  // PASSED ALL FILTERS → Send to LLM\n  results.push(item);\n}\n\nreturn results.length > 0 ? results : [{ isGood: false }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1136, -64],
+      "id": "70ab6b01-5dd5-4abe-80b7-0bd487a3ae4a",
+      "name": "Basic Filter",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "2f37603b-8542-4615-849c-507eb52ea3b4",
+              "leftValue": "={{ $json.isGood }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1312, -64],
+      "id": "73e6a9ad-28ab-411c-bb8a-32d3baa3db17",
+      "name": "Remove irrelavant posts"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Get all Saved Leads",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get all SubReddits",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Response": {
+      "main": [
+        [
+          {
+            "node": "Store if it's lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store if it's lead": {
+      "main": [
+        [
+          {
+            "node": "Append Lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many posts": {
+      "main": [
+        [
+          {
+            "node": "Loop Over SubReddits",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get all SubReddits": {
+      "main": [
+        [
+          {
+            "node": "Randomize Subreddits",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over SubReddits": {
+      "main": [
+        [
+          {
+            "node": "Check Post Freshness",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get many posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append Lead": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get all Saved Leads": {
+      "main": [
+        [
+          {
+            "node": "Set Saved IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Post ID": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Posts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Basic Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Saved IDs": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Check Post Freshness": {
+      "main": [[], []]
+    },
+    "Randomize Subreddits": {
+      "main": [
+        [
+          {
+            "node": "Loop Over SubReddits",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Set Prompts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Posts": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Check Post ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Prompts": {
+      "main": [
+        [
+          {
+            "node": "Use AI Agents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Use AI Agents": {
+      "main": [
+        [
+          {
+            "node": "Parse Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic Filter": {
+      "main": [
+        [
+          {
+            "node": "Remove irrelavant posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove irrelavant posts": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Posts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "f574a095-6e64-4954-b64b-76cd56749286",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c33ae80582838b3b98442df90461b31a6c5c881372c4412924f512290076ba6c"
+  },
+  "id": "OO3NSt1wUOoY0wlb",
+  "tags": [
+    {
+      "createdAt": "2025-07-15T15:56:37.750Z",
+      "updatedAt": "2025-07-15T15:56:37.750Z",
+      "id": "kE6Mfg0l09quznmw",
+      "name": "reddit"
+    },
+    {
+      "createdAt": "2025-07-11T12:47:49.138Z",
+      "updatedAt": "2025-07-11T12:47:49.138Z",
+      "id": "yULqasLKBkF2eikK",
+      "name": "lead-gen"
+    }
+  ]
+}

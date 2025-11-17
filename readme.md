@@ -115,6 +115,7 @@ reddit-lead-extractor-n8n/
 │    └── reddit_lead_extractor.json
 │── README.md
 │── .gitignore
+│── LICENSE
 ```
 
 ---
